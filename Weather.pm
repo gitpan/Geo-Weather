@@ -16,7 +16,7 @@ require Exporter;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw();
 @EXPORT = qw( $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT );
-$VERSION = '0.08';
+$VERSION = '0.09';
 
 $OK = 1;
 $ERROR_UNKNOWN = 0;
@@ -106,7 +106,7 @@ sub lookup {
 	$results{page} = $page;
 
 	my $not_found_marker = 'could not be found';
-	my $end_report_marker = 'Audio and Video Forecast';
+	my $end_report_marker = 'Temperature Converter';
 	my $line = '';
 
 	print STDERR __LINE__, ": Geo::Weather: Attempting to GET $results{url}\n" if $self->{debug};
@@ -144,7 +144,7 @@ sub lookup {
 			}
 		}
 
-		if ($line =~ /\<TITLE\>weather.com - Local Weather - (.*?)\<\/TITLE\>/) {
+		if ($line =~ /<TITLE>.*- (.*?)<\/TITLE>/) {
 			my ($city, $state) = split(/\,[\s+]/, $1);
 			$results{city} = $city;
 			if ($state =~ /(.*)\s+\((.*)\)/) {
