@@ -17,7 +17,7 @@
 # - Incorporated Mike's V1.1 $ERROR_BUSY changes
 
 # V1.2
-#  Parse new weather.com as of 2002-12-05
+#  Parse new weather.com as of 2002-12-05 -klp
 # - New image locator comment
 # - New current temperature locator
 # - New dew point locator
@@ -29,6 +29,15 @@
 
 # V1.21
 #  Parse new weather.com as of 2003-01-08 -klp
+
+# V1.22 - 1/27/03
+#  Bug Fix for negative dew points -klp
+
+# V1.23 - 02/24/03
+# Change to picture parsing for new HTML code -klp
+
+# V1.3 - 05/27/03
+# Change request URL -klp
 
 package Geo::Weather;
 
@@ -44,7 +53,7 @@ require Exporter;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw();
 @EXPORT = qw( $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT $ERROR_BUSY);
-$VERSION = '1.2.1';
+$VERSION = '1.3';
 
 $OK = 1;
 $ERROR_UNKNOWN = 0;
@@ -63,8 +72,8 @@ sub new {
 	$self->{version} = $VERSION;
 	$self->{server} = 'www.weather.com';
 	$self->{port} = 80;
-	$self->{base} = '/search/search?where=';
-	$self->{ext} = '&what=WeatherLocalUndeclared&GO=GO';
+	$self->{base} = '/weather/local/';
+	$self->{ext} = '?setcookie=1';
 	$self->{timeout} = 10;
 	$self->{proxy} = '';
 	$self->{proxy_username} = '';
@@ -284,7 +293,9 @@ sub lookup {
 	my $proxy_pass = $self->{proxy_pass} || $ENV{HTTP_PROXY_PASS} || '';
 	$request->proxy_authorization_basic($proxy_user, $proxy_pass) if $self->{proxy} && $proxy_user;
 
+	$ua->cookie_jar({ file => "$ENV{HOME}/.cookies.txt" });
 	$ua->timeout($self->{timeout}) if $self->{timeout};
+
 	$ua->agent($self->{agent_string});
 	$ua->proxy(['http'], $self->{proxy}) if $self->{proxy};
 
@@ -307,6 +318,7 @@ sub lookup {
 			return $ERROR_BUSY;
 		}
 
+		#Parse - City, State, Zip
 		if ($line =~ /<b>Local Forecast for (.*?)<\/b>/i || $line =~ /<b>Travel Forecast for (.*?)<\/b>/i) {
 			my ($city, $state) = split(/\,[\s+]/, $1);
 			$results{city} = $city;
@@ -318,27 +330,35 @@ sub lookup {
 			}
 		}
 
+		#Parse - Picture
 		if (!$results{pic}) {
-			if ($line =~ /<TD CLASS=obsInfo1 VALIGN=TOP ALIGN=CENTER>\s*<img src=(.*?)\s/i) {
+			if ($line =~ /<TD CLASS=obsInfo1.*>\s*<img src=(.*?)\s/i) {
 				$results{pic} = $1;
 			}
 		}
+
+		#Parse - Current Conditions
 		if (!$results{cond}) {
 			if ($line =~ /obsTextA>\s*(.*)<\/B/i) {
 				$results{cond} = $1;
 			}
 		}
+
+		#Parse - Temperature
 		if (!$results{temp}) {
 			if ($line =~ /obsTempTextA>\s*(.*?)[<&]/i) {
 				$results{temp} = $1;
 			}
 		}
+
+		#Parse - Heat Index
 		if (!$results{heat}) {
 			if ($line =~ /Feels Like<\w+>\s*(.*?)[<&]/) {
 				$results{heat} = $1;
 			}
 		}
 
+		#Parse - UV Index
 		if (!$results{uv}) {
 			if ($line =~ /UV Index:/) {
 				$uv_cnt = 1;
@@ -352,6 +372,7 @@ sub lookup {
 			}
 		}
 
+		#Parse - Wind Speed
 		if (!$results{wind}) {
 			if ($line =~ /Wind:/) {
 				$wind_cnt = 1;
@@ -365,6 +386,7 @@ sub lookup {
 			}
 		}
 
+		#Parse - Dew Point
 		if (!$results{dewp}) {
 			if ($line =~ /Dew Point:/) {
 				$dew_cnt = 1;
@@ -372,12 +394,13 @@ sub lookup {
 				$dew_cnt++;
 			}
 
-			if ($dew_cnt == 2 && $line =~ /obsInfo2>\s*(\d+)/) {
+			if ($dew_cnt == 2 && $line =~ /obsInfo2>\s?(.*)</i) {
 
 				$results{dewp} = $1;
 			}
 		}
 
+		#Parse - Humidity
 		if (!$results{humi}) {
 			if ($line =~ /Humidity:/) {
 				$rh_cnt = 1;
@@ -391,6 +414,7 @@ sub lookup {
 			}
 		}
 
+		#Parse - Visability
 		if (!$results{visb}) {
 			if ($line =~ /Visibility:/) {
 				$vis_cnt = 1;
@@ -404,6 +428,7 @@ sub lookup {
 			}
 		}
 
+		#Parse - Barometer
 		if (!$results{baro}) {
 			if ($line =~ /Pressure:/) {
 				$baro_cnt = 1;
@@ -426,6 +451,7 @@ sub lookup {
 		$results{visb} = 'Not Available';
 	}
 
+	#Celcius Conversions
 	$results{temp_c} = sprintf("%0.0f", 5/9 * ($results{temp} - 32));
 	$results{dewp_c} = sprintf("%0.0f", 5/9 * ($results{dewp} - 32));
 

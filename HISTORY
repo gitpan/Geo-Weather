@@ -28,3 +28,7 @@
 1.2 More weather.com changes, added report_raw function. Current as of 2002-12-05 thanks to Kevin L. Papendick
 
 1.2.1 More weather.com changes. Current as of 2003-01-17 thanks to Kevin L. Papendick again :)
+
+1.2.2 Update for cities with negative dew points
+
+1.3 Change request URL -klp
