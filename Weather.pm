@@ -27,6 +27,9 @@
 # - New UV locator
 # - New wind locator
 
+# V1.21
+#  Parse new weather.com as of 2003-01-08 -klp
+
 package Geo::Weather;
 
 use strict;
@@ -41,7 +44,7 @@ require Exporter;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw();
 @EXPORT = qw( $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT $ERROR_BUSY);
-$VERSION = '1.2';
+$VERSION = '1.2.1';
 
 $OK = 1;
 $ERROR_UNKNOWN = 0;
@@ -271,7 +274,7 @@ sub lookup {
 	$results{page} = $page;
 
 	my $not_found_marker = 'not found';
-	my $end_report_marker = '<!-- insert reported/last updated info -->';
+	my $end_report_marker = '<!-- vertical outlet #1 -->';
 	my $line = '';
 
 	print STDERR __LINE__, ": Geo::Weather: Attempting to GET $results{url}\n" if $self->{debug};
@@ -316,17 +319,17 @@ sub lookup {
 		}
 
 		if (!$results{pic}) {
-			if ($line =~ /<!-- http:\/\/image.weather.com\/web\/common\/wxicons\/52\/666.gif -->\s*<img src=\"(.*?)\"/i) {
+			if ($line =~ /<TD CLASS=obsInfo1 VALIGN=TOP ALIGN=CENTER>\s*<img src=(.*?)\s/i) {
 				$results{pic} = $1;
 			}
 		}
 		if (!$results{cond}) {
-			if ($line =~ /<!-- insert forecast -->(.*?)\s*[<&]/) {
+			if ($line =~ /obsTextA>\s*(.*)<\/B/i) {
 				$results{cond} = $1;
 			}
 		}
 		if (!$results{temp}) {
-			if ($line =~ /obsTempTextBlue\"><\w+>\s*(.*?)[<&]/i) {
+			if ($line =~ /obsTempTextA>\s*(.*?)[<&]/i) {
 				$results{temp} = $1;
 			}
 		}
@@ -343,7 +346,7 @@ sub lookup {
 				$uv_cnt++;
 			}
 
-			if ($uv_cnt == 3 && $line =~ /obsTextBlue\">\s*(.*)</) {
+			if ($uv_cnt == 2 && $line =~ /obsInfo2>\s*(.*)</) {
 
 				$results{uv} = $1;
 			}
@@ -356,7 +359,7 @@ sub lookup {
 				$wind_cnt++;
 			}
 
-			if ($wind_cnt == 3 && $line =~ /obsTextBlue\">\s*(.*)</) {
+			if ($wind_cnt == 2 && $line =~ /obsInfo2>\s*(.*)</) {
 
 				$results{wind} = $1;
 			}
@@ -369,7 +372,7 @@ sub lookup {
 				$dew_cnt++;
 			}
 
-			if ($dew_cnt == 3 && $line =~ /obsTextBlue\">\s*(\d+)/) {
+			if ($dew_cnt == 2 && $line =~ /obsInfo2>\s*(\d+)/) {
 
 				$results{dewp} = $1;
 			}
@@ -382,7 +385,7 @@ sub lookup {
 				$rh_cnt++;
 			}
 
-			if ($rh_cnt == 3 && $line =~ /obsTextBlue\">\s*(\d+)/) {
+			if ($rh_cnt == 2 && $line =~ /obsInfo2>\s*(\d+)/) {
 
 				$results{humi} = $1;
 			}
@@ -395,7 +398,7 @@ sub lookup {
 				$vis_cnt++;
 			}
 
-			if ($vis_cnt == 3 && $line =~ /obsTextBlue\">\s*(.*)\s*</) {
+			if ($vis_cnt == 2 && $line =~ /obsInfo2>\s*(.*)\s*</) {
 
 				$results{visb} = $1;
 			}
@@ -408,7 +411,7 @@ sub lookup {
 				$baro_cnt++;
 			}
 
-			if ($baro_cnt == 3 && $line =~ /obsTextBlue\">\s*(.*)\s*</) {
+			if ($baro_cnt == 2 && $line =~ /obsInfo2>\s*(.*)\s*</) {
 
 				$results{baro} = $1;
 			}
