@@ -13,16 +13,35 @@ print "ok 1\n";
 
 ######################### End of black magic.
 
-# Insert your test code below (better if it prints "ok 13"
-# (correspondingly "not ok 13") depending on the success of chunk 13
-# of the test code):
-
 $weather = new Geo::Weather;
 $weather->{timeout} = 3;
 
 print "Enter US zipcode of location you are at: ";
 my $zip = <STDIN>;
 chomp($zip);
+
+print "Proxy (just press enter if no proxy): ";
+my $proxy = <STDIN>;
+chomp($proxy);
+$weather->{proxy} = $proxy;
+
+if ($proxy) {
+	unless ($ENV{HTTP_PROXY_USER}) {
+		print "Proxy Username: ";
+		my $proxy_user = <STDIN>;
+		chomp($proxy_user);
+		$weather->{proxy_user} = $proxy_user;
+	}
+
+	unless ($ENV{HTTP_PROXY_PASS}) {
+		print "Proxy Password: ";
+		my $proxy_pass = <STDIN>;
+		chomp($proxy_pass);
+		$weather->{proxy_pass} = $proxy_pass;
+	}
+}
+
+
 print "Attempting to connect to weather.com...\n\n";
 
 my $condition = $weather->get_weather($zip);

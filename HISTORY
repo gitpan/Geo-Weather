@@ -15,3 +15,5 @@
 0.07 Converted to LWP::UserAgent to fix socket problems. Be sure to use a recent libwww-perl so timeout
      code works correctly.
 
+0.08 Added proxy authentication support.
+

@@ -16,7 +16,7 @@ require Exporter;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw();
 @EXPORT = qw( $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT );
-$VERSION = '0.07';
+$VERSION = '0.08';
 
 $OK = 1;
 $ERROR_UNKNOWN = 0;
@@ -36,6 +36,8 @@ sub new {
 	$self->{base} = '/search/search';
 	$self->{timeout} = 10;
 	$self->{proxy} = '';
+	$self->{proxy_username} = '';
+	$self->{proxy_password} = '';
 	$self->{agent_string} = 'Geo::Weather/0.07';
 
 	bless $self, $class;
@@ -110,10 +112,14 @@ sub lookup {
 	print STDERR __LINE__, ": Geo::Weather: Attempting to GET $results{url}\n" if $self->{debug};
 	my $ua = new LWP::UserAgent;
 	my $request = new HTTP::Request('GET',$results{url});
+	my $proxy_user = $self->{proxy_user} || $ENV{HTTP_PROXY_USER} || '';
+	my $proxy_pass = $self->{proxy_pass} || $ENV{HTTP_PROXY_PASS} || '';
+	$request->proxy_authorization_basic($proxy_user, $proxy_pass) if $self->{proxy} && $proxy_user;
 
 	$ua->timeout($self->{timeout}) if $self->{timeout};
 	$ua->agent($self->{agent_string});
 	$ua->proxy(['http'], $self->{proxy}) if $self->{proxy};
+	
 
 	my $response = $ua->request($request);
 	unless ($response->is_success) {
@@ -330,7 +336,7 @@ Gets current weather given a full weather.com URL
 
 B<Sample Code>
 
-	my $current = $weather->lookup('http://www.weather.com/weather/cities/us_ca_folsom.html');
+	my $current = $weather->lookup('http://www.weather.com/search/search?where=95630');
 
 B<Returns>
 
@@ -359,6 +365,14 @@ is 10 seconds. Set to 0 to disable timeouts.
 =item * B<proxy>
 
 Use HTTP proxy for the request. Format is http://proxy.server:port/. Default is no proxy.
+
+=item * B<proxy_user>
+
+Sets the username to use for proxying. Defaults to the HTTP_PROXY_USER environment variable, if set, or don't use authentication if blank.
+
+=item * B<proxy_pass>
+
+Sets the password to use for proxying. Defaults to the HTTP_PROXY_PASS environment variable, if set.
 
 =item *B<agent_string>
 

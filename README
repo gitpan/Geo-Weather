@@ -16,7 +16,6 @@ SYNOPSIS
 
       my $weather = new Geo::Weather;
       $weather->{timeout} = 5; # set timeout to 5 seconds instead of the default of 10
-      #$weather->{proxy} = 'http://proxy1.mydomain.com:8001/'; # Uncomment to enable proxy
  
       my $current = $weather->get_weather('95630');
 
@@ -89,7 +88,7 @@ FUNCTIONS
 
         Sample Code
 
-                my $current = $weather->lookup('http://www.weather.com/weather/cities/us_ca_folsom.html');
+                my $current = $weather->lookup('http://www.weather.com/search/search?where=95630');
 
         Returns
 
@@ -116,6 +115,14 @@ OBJECT KEYS
     * proxy
     Use HTTP proxy for the request. Format is http://proxy.server:port/.
     Default is no proxy.
+
+    * proxy_user
+    Sets the username to use for proxying. Defaults to the HTTP_PROXY_USER
+    environment variable, if set, or don't use authentication if blank.
+
+    * proxy_pass
+    Sets the password to use for proxying. Defaults to the HTTP_PROXY_PASS
+    environment variable, if set.
 
     *agent_string
     HTTP User-Agent header for request. Default is Geo::Weather/$VERSION.
