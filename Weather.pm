@@ -17,7 +17,7 @@ require Exporter;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw();
 @EXPORT = qw( $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND );
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 $OK = 1;
 $ERROR_UNKNOWN = 0;
@@ -109,7 +109,8 @@ sub lookup {
 
 	print STDERR __LINE__, ": Geo::Weather: Getting $page from $self->{server}:$self->{port}\n" if $self->{debug};
 	$results{page} = $page;
-	print $remote "GET $page HTTP/1.0\n\n";
+	print $remote "GET $page HTTP/1.1\n";
+	print $remote "Host: $self->{server}\n\n";
 
 	if (!$redir) {
 		while ($line = <$remote>) {
