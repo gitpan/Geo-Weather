@@ -39,6 +39,14 @@
 # V1.3 - 05/27/03
 # Change request URL -klp
 
+# V1.31 - 05/28/03
+# Added data_check() function in an effort to detect and catch bad/missing data. -klp
+# Removed unnecessary UserAgent cookie jar left behind from V1.3 development -klp
+
+# V1.32 - 06/12/03 -klp
+# Changed $self->{server} value
+# Cleared $self->{ext} value
+
 package Geo::Weather;
 
 use strict;
@@ -53,7 +61,7 @@ require Exporter;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw();
 @EXPORT = qw( $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT $ERROR_BUSY);
-$VERSION = '1.3';
+$VERSION = '1.32';
 
 $OK = 1;
 $ERROR_UNKNOWN = 0;
@@ -70,10 +78,10 @@ sub new {
 	my $self = {};
 	$self->{debug} = 0;
 	$self->{version} = $VERSION;
-	$self->{server} = 'www.weather.com';
+	$self->{server} = 'www.w3.weather.com';
 	$self->{port} = 80;
 	$self->{base} = '/weather/local/';
-	$self->{ext} = '?setcookie=1';
+	$self->{ext} = '';
 	$self->{timeout} = 10;
 	$self->{proxy} = '';
 	$self->{proxy_username} = '';
@@ -106,6 +114,16 @@ sub get_weather {
 	$self->{results} = $self->lookup($page);
 
 	return $self->{results};
+}
+
+sub data_check {
+	my $self = shift;
+	my $data = $self->report_raw();
+	my $data_integrity = 1;
+
+	$data_integrity = 0 if ($data =~ /^\|{4}/);
+
+	return $data_integrity;
 }
 
 sub report_raw {
@@ -293,7 +311,6 @@ sub lookup {
 	my $proxy_pass = $self->{proxy_pass} || $ENV{HTTP_PROXY_PASS} || '';
 	$request->proxy_authorization_basic($proxy_user, $proxy_pass) if $self->{proxy} && $proxy_user;
 
-	$ua->cookie_jar({ file => "$ENV{HOME}/.cookies.txt" });
 	$ua->timeout($self->{timeout}) if $self->{timeout};
 
 	$ua->agent($self->{agent_string});
@@ -577,6 +594,22 @@ Returns pipe delimited string containing the current weather. Must call get_weat
 B<Sample Code>
 
 	my $current = $weather->report_raw();
+
+=back
+
+
+=over 4
+
+=item * B<data_check>
+
+Returns a boolean value indicating if valid weather data appears to have been retrieved. Must call get_weather first.
+
+B<Sample Code>
+
+	my $valid = $weather->data_check();
+	unless ($valid) {
+		die "The weather data retrieved appears to be bad or missing.\n";
+	}
 
 =back
 

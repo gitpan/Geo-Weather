@@ -32,3 +32,12 @@
 1.2.2 Update for cities with negative dew points
 
 1.3 Change request URL -klp
+
+V1.31 - 05/28/03
+Added data_check() function in an effort to detect and catch bad/missing data. -klp
+Removed unnecessary UserAgent cookie jar left behind from V1.3 development -klp
+
+V1.32 - 06/12/03 -klp
+Changed $self->{server} value
+Cleared $self->{ext} value
+
