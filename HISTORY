@@ -41,3 +41,17 @@ V1.32 - 06/12/03 -klp
 Changed $self->{server} value
 Cleared $self->{ext} value
 
+V1.4 - 08/12/03 -klp
+Bug Fix for City, State request.  Added recursive lookup call against redirect URL.
+Added get_city(), get_state() functions.
+Added set_report_colors() functions.
+Minor reformatting of report() function.
+Added lookup_forecast() and report_forecast() function.
+Removed $self->{ext} variable.
+Additional debugging messages added.
+
+V1.41 - 08/27/03 -klp
+Changed City, State URL extraction due to weather.com change
+Changed $self->{forecast_flag} to $self->{location_code} as it is now needed by
+both the current and forecast weather retrievals
+
