@@ -1,7 +1,6 @@
 ## Geo::Weather
 ## Written by Mike Machado <mike@innercite.com> 2000-11-01
 ##
-## weather.com code originally from hawk@redtailedhawk.net
 
 package Geo::Weather;
 
@@ -10,14 +9,14 @@ use Carp;
 use IO::Socket;
 
 use vars qw( $VERSION @ISA @EXPORT @EXPORT_OK
-		 $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND);
+		 $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT);
 
 require Exporter;
  
 @ISA = qw(Exporter);
 @EXPORT_OK = qw();
-@EXPORT = qw( $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND );
-$VERSION = '0.04';
+@EXPORT = qw( $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT );
+$VERSION = '0.05';
 
 $OK = 1;
 $ERROR_UNKNOWN = 0;
@@ -25,7 +24,9 @@ $ERROR_QUERY = -1;
 $ERROR_PAGE_INVALID = -2;
 $ERROR_CONNECT = -3;
 $ERROR_NOT_FOUND = -4;
+$ERROR_TIMEOUT = -5;
 
+my $alarm_caught = 0;
 
 sub new {
 	my $class = shift;
@@ -35,7 +36,10 @@ sub new {
 	$self->{server} = 'www.weather.com';
 	$self->{port} = 80;
 	$self->{base} = '/search/search';
- 
+	$self->{timeout} = 10;
+
+	$SIG{ALRM} = sub { $alarm_caught = 1;};
+
 	bless $self, $class;
 	return $self;
 }
@@ -100,16 +104,16 @@ sub lookup {
 	$results{url} .= ":$self->{port}" unless $self->{port} eq '80';
 	$results{url} .= $page;
 
-	my $marker='<!-- Begin Main Content Here';
-	my $end_report_marker='UV Index';
 	my $not_found_marker = 'could not be found';
-	my $lines = 90;
+	my $end_report_marker = 'Audio and Video Forecast';
 	my $lines_read = 0;
 	my $line = '';
 
 	print STDERR __LINE__, ": Geo::Weather: Attempting to connect to $self->{server}:$self->{port}\n" if $self->{debug};
 
+	alarm($self->{timeout});
 	my $remote = IO::Socket::INET->new(Proto=>'tcp', PeerAddr=>$self->{server}, PeerPort=>$self->{port}, Reuse=>1) || return $ERROR_CONNECT;
+	return $ERROR_TIMEOUT if $alarm_caught;
 
 	print STDERR __LINE__, ": Geo::Weather: Getting $page from $self->{server}:$self->{port}\n" if $self->{debug};
 	$results{page} = $page;
@@ -117,9 +121,10 @@ sub lookup {
 	print $remote "Host: $self->{server}\n\n";
 
 	if (!$redir) {
+		alarm($self->{timeout});
 		while ($line = <$remote>) {
 			chop($line);
-			chomp($line);
+			chop($line);
 			return $ERROR_NOT_FOUND if ($line =~ /$not_found_marker/i);
 			if ($line =~ /location: http:\/\/.*?\/(.*)/) {
 				$page = '/'.$1;
@@ -129,7 +134,7 @@ sub lookup {
 				$line = <$remote>;
 				$line = <$remote>;
 				chop($line);
-				chomp($line);
+				chop($line);
 				close($remote);
 				if ($line =~ /\"(.*?)\"/) {
 					print STDERR __LINE__, ": Geo::Weather: Found search result $1\n" if $self->{debug};
@@ -137,127 +142,86 @@ sub lookup {
 				}
 			}
 		}
+		return $ERROR_TIMEOUT if $alarm_caught;
 		return $ERROR_NOT_FOUND;
 	}
 
-	while($line !~ /$marker/) {
-		$lines_read++;
-		$line=<$remote>;
-		print STDERR __LINE__, ": Geo::Weather: recv_line: $line" if $self->{debug} > 1;
-		if ($line =~ /\<TITLE\>weather.com - Local Weather - (.*?)\<\/TITLE\>/) {
-			my ($city, $state) = split(/\,[\s+]/, $1);
-			$results{city} = $city;
-			$results{state} = $state;
-		}
-	}
-
 	my $x = '';
-
-	print STDERR __LINE__, ": Geo::Weather: Marker found, parsing report\n" if $self->{debug};
+	alarm($self->{timeout});
 	while($line = <$remote>) {
 
 		chop($line);
 		chomp($line);
 		$lines_read++;
 
+		if ($line =~ /\<TITLE\>weather.com - Local Weather - (.*?)\<\/TITLE\>/) {
+			my ($city, $state) = split(/\,[\s+]/, $1);
+			$results{city} = $city;
+			$results{state} = $state;
+		}
+		if (!$results{pic}) {
+			if ($line =~ /<!-- insert wx icon --><img src=\"(.*?)\"/) {
+				$results{pic} = $1;
+			}
+		}
+		if (!$results{cond}) {
+			if ($line =~ /<!-- insert forecast text -->(.*?)[<&]/) {
+				$results{cond} = $1;
+			}
+		}
+		if (!$results{temp}) {
+			if ($line =~ /<!-- insert current temp -->(.*?)[<&]/) {
+				$results{temp} = $1;
+			}
+		}
+		if (!$results{heat}) {
+			if ($line =~ /<!-- insert feels like temp -->(.*?)[<&]/) {
+				$results{heat} = $1;
+			}
+		}
+		if (!$results{uv}) {
+			if ($line =~ /<!-- insert UV number -->(.*?)[<&]/) {
+				$results{uv} = $1;
+			}
+		}
+		if (!$results{wind}) {
+			if ($line =~ /<!-- insert wind information -->(.*?)[<&]/) {
+				$results{wind} = $1;
+			}
+		}
+		if (!$results{dewp}) {
+			if ($line =~ /<!-- insert dew point -->(.*?)[<&]/) {
+				$results{dewp} = $1;
+			}
+		}
+		if (!$results{humi}) {
+			if ($line =~ /<!-- insert humidity -->(.*?)[\s<&]/) {
+				$results{humi} = $1;
+			}
+		}
+		if (!$results{visb}) {
+			if ($line =~ /<!-- insert visibility -->(.*?)[<&]/) {
+				$results{visb} = $1;
+			}
+		}
+		if (!$results{visb}) {
+			if ($line =~ /<!-- insert visibility -->(.*?)[<&]/) {
+				$results{visb} = $1;
+			}
+		}
+		if (!$results{baro}) {
+			if ($line =~ /<!-- insert barometer information -->(.*?)[<&]/) {
+				$results{baro} = $1;
+			}
+		}
+
 		if ($line =~ /$end_report_marker/) {
-			print STDERR __LINE__, ": Geo::Weather: End of report\n" if $self->{debug};
 			last;
 		}
-
-		if(!($results{pic}) || !($results{cond})) {
-			if($line =~ /wxicons/) {
-				if ($line =~ /\"(.*?)\"/) {
-					$results{pic} = $1;
-				}
-				if ($line =~ /(ALT|alt)=\"(.*?)\"/) {
-					$results{cond} = $2 unless $results{cond};
-				}
-				next;
-			}
-		}
-		if (!($results{cond}) || !($results{head})) {
-			if ($line =~ /Feels Like/) {
-				if ($line =~ /\<.*?>(.*?)\<BR\>Feels Like&nbsp;(.*)/) {
-					$results{cond} = $1 unless $results{cond};
-					$results{heat} = $2;
-					if ($results{heat} =~ /(\d+).*/) {
-						$results{heat} = $1;
-					}
-					next;
-				}
-			}
-		}
-		if(!($results{temp})){
-			if($line =~ /obsTempText/) {
-				if ($line =~ /\<.*?\>.*?(\d+)\<.*\>/) {
-					$results{temp} = $1;
-					next;
-				}
-			}
-		}
-
-		if(!($results{wind})) {
-			if($line=~/Wind:/)  {
-				$line = <$remote>;
-				$line = <$remote>;
-				chop($line);
-				chomp($line);
-				if ($line =~ /\<.*?\>(.*?)\<.*\>/) {
-					$results{wind} = $1;
-				}
-				next;
-			}
-		}
-
-		if(!($results{dewp})) {
-			if($line=~/Dew Point:/) {
-				$line = <$remote>;
-				$line = <$remote>;
-				chop($line);
-				chomp($line);
-				if ($line =~ /\<.*?\>(\d+).*\<.*\>/) {
-					$results{dewp} = $1;
-				}
-				next;
-			}
-		}
-		if(!($results{humi})) {
-			if($line=~/Humidity:/)    {
-				$line = <$remote>;
-				$line = <$remote>;
-				chop($line);
-				chomp($line);
-				if ($line =~ /\<.*?\>(\d+) %\<.*\>/) {
-					$results{humi} = $1;
-				}
-				next;
-			}
-		}
-		if(!($results{visb})) {
-			if($line=~/Visibility:/) {
-				$line = <$remote>;
-				$line = <$remote>;
-				chop($line);
-				chomp($line);
-				if ($line =~ /\<.*?\>(.*?)\<.*\>/) {
-					$results{visb} = $1;
-				}
-				next;
-			}
-		}
-		if(!($results{baro})) {
-			if($line=~/Barometer:/) {
-				$line = <$remote>;
-				$line = <$remote>;
-				chop($line);
-				chomp($line);
-				if ($line =~ /\<.*?\>(.*?)\<.*\>/) {
-					$results{baro} = $1;
-				}
-				next;
-			}
-		}
+	}
+	if ($alarm_caught) {
+		close($remote);
+		return $ERROR_TIMEOUT;
 	}
 
 	if (!($results{visb})) {
@@ -268,6 +232,8 @@ sub lookup {
 
 	return \%results;
 }
+
+1;
 
 __END__
 
@@ -290,6 +256,7 @@ Geo::Weather - Weather retrieval module
   use Geo::Weather;
 
   my $weather = new Geo::Weather;
+  $weather->{timeout} = 5; # set timeout to 5 seconds instead of the default of 10
  
   my $current = $weather->get_weather('95630');
 
@@ -343,7 +310,7 @@ B<Returns>
 	humi		- Current rel. humidity
 	visb		- Current visibility
 	baro		- Current barometric pressure
-	heat		- Current heat index
+	heat		- Current heat index (Feels Like string)
 
 	On error, it returns the following exported error variables
 
@@ -353,6 +320,7 @@ B<Errors>
 	$ERROR_PAGE_INVALID	- No URL, or incorrectly formatted URL for retrieving the information
 	$ERROR_CONNECT		- Error connecting to weather.com
 	$ERROR_NOT_FOUND	- Weather for the specified city/state or zip could not be found
+	$ERROR_TIMEOUT		- Timed out while trying to connect or get data from weather.com
 
 =back
 
@@ -387,6 +355,21 @@ B<Returns>
 
 =back
 
+=head1 OBJECT KEYS
+
+There are several object hash keys that can be set to manipulate how B<Geo::Weather> works. The hash keys
+should be set directly following C<new>.
+
+Below is a list of each key and what it does:
+
+=item * B<debug>
+
+Enable debug output of the connection attempts to weather.com
+
+=item * B<timeout>
+
+Controls the timeout, in seconds, when trying to connect to or get data from weather.com. Default timeout
+is 10 seconds.
 
 =head1 AUTHOR
 

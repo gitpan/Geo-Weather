@@ -5,3 +5,7 @@
 0.03 Added support for HTTP/1.1 because Weather.com requires HTTP/1.1 only
 
 0.04 Changed how the current condition was located before of more weather.com changes
+
+0.05 Complete rewrite of parsing code because of more weather.com changes. By the looks of their
+     new tags, one would hope they will not be making more changes in the near future. Timeout
+     code has also been added.
