@@ -22,3 +22,7 @@
 1.0  Fixed agent string to contain latest version number. Added heat index to report(). Cleaned up documentation.
 
 1.1  More weather.com changes. Added dependancy on LWP::UserAgent. Added new error code when weather.com is too busy to handle requests.
+
+1.1.1 Suport for celcius, fixes.
+
+1.2 More weather.com changes, added report_raw function. Current as of 2002-12-05 thanks to Kevin L. Papendick

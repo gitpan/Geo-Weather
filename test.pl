@@ -15,10 +15,15 @@ print "ok 1\n";
 
 $weather = new Geo::Weather;
 $weather->{timeout} = 10;
+$weather->{debug} = 2; # Adjust debug level
 
-print "Enter US zipcode of location you are at: ";
-my $zip = <STDIN>;
-chomp($zip);
+print "Enter city of location you are at: ";
+my $city = <STDIN>;
+chomp($city);
+
+print "Enter state of location you are at: ";
+my $state = <STDIN>;
+chomp($state);
 
 print "Proxy (just press enter if no proxy): ";
 my $proxy = <STDIN>;
@@ -44,13 +49,14 @@ if ($proxy) {
 
 print "Attempting to connect to weather.com...\n\n";
 
-my $condition = $weather->get_weather($zip);
+my $condition = $weather->get_weather($city, $state);
 
 if (ref $condition) {
 	print "Current Conditions for $condition->{city}, $condition->{state}:\n\n";
 	print " Condition: $condition->{cond}\n";
 	print " Condition Image: $condition->{pic}\n";
 	print " Temp: $condition->{temp} F\n";
+	print " Temp: $condition->{temp_c} C\n";
 	print " Wind: $condition->{wind}\n";
 	print " Heat Index: $condition->{heat} F\n";
 	print " Visability: $condition->{visb}\n";
