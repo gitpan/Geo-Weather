@@ -65,15 +65,16 @@ FUNCTIONS
                 baro            - Current barometric pressure
                 heat            - Current heat index (Feels Like string)
 
-                On error, it returns the following exported error variables
-
         Errors
+
+                On error, it returns one of the following exported error variables
 
                 $ERROR_QUERY            - Invalid data supplied
                 $ERROR_PAGE_INVALID     - No URL, or incorrectly formatted URL for retrieving the information
                 $ERROR_CONNECT          - Error connecting to weather.com
                 $ERROR_NOT_FOUND        - Weather for the specified city/state or zip could not be found
                 $ERROR_TIMEOUT          - Timed out while trying to connect or get data from weather.com
+                $ERROR_BUSY             - weather.com is too busy to handle requests and is in Severe Weather Alert Mode
 
     * report
         Returns an HTML table containing the current weather. Must call
@@ -124,7 +125,7 @@ OBJECT KEYS
     Sets the password to use for proxying. Defaults to the HTTP_PROXY_PASS
     environment variable, if set.
 
-    *agent_string
+    * agent_string
     HTTP User-Agent header for request. Default is Geo::Weather/$VERSION.
 
 AUTHOR

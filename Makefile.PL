@@ -6,5 +6,6 @@ WriteMakefile(
       ? (ABSTRACT   => 'Get current weather from weather.com',
          AUTHOR     => 'Mike Machado <mike@innercite.com>')
       : ()),
-  'dist' => {COMPRESS=>'gzip',SUFFIX=>'gz'}
+  'dist' => {COMPRESS=>'gzip',SUFFIX=>'gz'},
+  'PREREQ_PM' => {LWP::UserAgent => 1.73}
 );

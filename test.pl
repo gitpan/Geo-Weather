@@ -14,7 +14,7 @@ print "ok 1\n";
 ######################### End of black magic.
 
 $weather = new Geo::Weather;
-$weather->{timeout} = 3;
+$weather->{timeout} = 10;
 
 print "Enter US zipcode of location you are at: ";
 my $zip = <STDIN>;
@@ -52,7 +52,7 @@ if (ref $condition) {
 	print " Condition Image: $condition->{pic}\n";
 	print " Temp: $condition->{temp} F\n";
 	print " Wind: $condition->{wind}\n";
-	print " Head Index: $condition->{heat} F\n";
+	print " Heat Index: $condition->{heat} F\n";
 	print " Visability: $condition->{visb}\n";
 	print " Barometer: $condition->{baro}\n\n";
 	print "If the above results are correct, your Geo::Weather installation is functioning normally\n";

@@ -1,5 +1,5 @@
 ## Geo::Weather
-## Written by Mike Machado <mike@innercite.com> 2000-11-01
+## Written by Mike Machado <mike@innercite.com> 2002-06-15
 ##
 
 package Geo::Weather;
@@ -9,14 +9,14 @@ use Carp;
 use LWP::UserAgent;
 
 use vars qw( $VERSION @ISA @EXPORT @EXPORT_OK
-		 $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT);
+		 $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT $ERROR_BUSY);
 
 require Exporter;
  
 @ISA = qw(Exporter);
 @EXPORT_OK = qw();
-@EXPORT = qw( $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT );
-$VERSION = '0.09';
+@EXPORT = qw( $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT $ERROR_BUSY);
+$VERSION = '1.1';
 
 $OK = 1;
 $ERROR_UNKNOWN = 0;
@@ -25,6 +25,7 @@ $ERROR_PAGE_INVALID = -2;
 $ERROR_CONNECT = -3;
 $ERROR_NOT_FOUND = -4;
 $ERROR_TIMEOUT = -5;
+$ERROR_BUSY = -6;
 
 sub new {
 	my $class = shift;
@@ -33,12 +34,12 @@ sub new {
 	$self->{version} = $VERSION;
 	$self->{server} = 'www.weather.com';
 	$self->{port} = 80;
-	$self->{base} = '/search/search';
+	$self->{base} = '/search/search?what=WeatherLocalUndeclared&';
 	$self->{timeout} = 10;
 	$self->{proxy} = '';
 	$self->{proxy_username} = '';
 	$self->{proxy_password} = '';
-	$self->{agent_string} = 'Geo::Weather/0.07';
+	$self->{agent_string} = "Geo::Weather/$VERSION";
 
 	bless $self, $class;
 	return $self;
@@ -54,13 +55,13 @@ sub get_weather {
 	my $page = '';
 	if ($city =~ /^\d+$/) {
 		# Use zip code
-		$page = $self->{base}.'?where='.$city;
+		$page = $self->{base}.'where='.$city;
 	} else {
 		# Use state_city
 		$state = lc($state);
 		$city = lc($city);
 		$city =~ s/ /+/g;
-		$page = $self->{base}.'?where='.$city.','.$state;
+		$page = $self->{base}.'where='.$city.','.$state;
 	}
 
 	$self->{results} = $self->lookup($page);
@@ -80,6 +81,7 @@ sub report {
 	$output .= "<font size=+3>$results->{cond}</font><br>\n";
 	$output .= "<table border=0>\n";
 	$output .= "<tr><td><b>Temp</b></td><td>$results->{temp}&deg F</td>\n";
+	$output .= "<tr><td><b>Heat Index</b></td><td>$results->{heat}&deg F</td>\n";
 	$output .= "<tr><td><b>Wind</b></td><td>$results->{wind}</td>\n" if $results->{wind};
 	$output .= "<tr><td><b>Dew Point</b></td><td>$results->{dewp}&deg F</td>\n";
 	$output .= "<tr><td><b>Rel. Humidity</b></td><td>$results->{humi}</td>\n";
@@ -106,7 +108,6 @@ sub lookup {
 	$results{page} = $page;
 
 	my $not_found_marker = 'could not be found';
-	my $end_report_marker = 'Temperature Converter';
 	my $line = '';
 
 	print STDERR __LINE__, ": Geo::Weather: Attempting to GET $results{url}\n" if $self->{debug};
@@ -131,7 +132,7 @@ sub lookup {
 	for (my $i = 0; $i < @lines; $i++) {
 		my $line = $lines[$i];
 
-		print STDERR "tagline: $line\n" if ($line =~ /<!-- insert/ && $self->{debug} > 2);
+		print STDERR "tagline: $i: $line\n" if ($line =~ /<!-- insert/ && $self->{debug} > 2);
 		print STDERR "line: $line\n" if $self->{debug} > 3;
 
 		return $ERROR_NOT_FOUND if ($line =~ /$not_found_marker/i);
@@ -144,7 +145,11 @@ sub lookup {
 			}
 		}
 
-		if ($line =~ /<TITLE>.*- (.*?)<\/TITLE>/) {
+		if ($line =~ /<title>.*Severe Weather Mode Index.*/i) {
+			return $ERROR_BUSY;
+		}
+
+		if ($line =~ /<b>Local Forecast for (.*?)<\/b>/i) {
 			my ($city, $state) = split(/\,[\s+]/, $1);
 			$results{city} = $city;
 			if ($state =~ /(.*)\s+\((.*)\)/) {
@@ -155,17 +160,17 @@ sub lookup {
 			}
 		}
 		if (!$results{pic}) {
-			if ($line =~ /<!-- insert wx icon --><img src=\"(.*?)\"/) {
+			if ($line =~ /<!-- insert current weather icon -->\s*<img src=\"(.*?)\"/i) {
 				$results{pic} = $1;
 			}
 		}
 		if (!$results{cond}) {
-			if ($line =~ /<!-- insert forecast text -->(.*?)[<&]/) {
+			if ($line =~ /<!-- insert forecast -->(.*?)[<&]/) {
 				$results{cond} = $1;
 			}
 		}
 		if (!$results{temp}) {
-			if ($line =~ /<!-- insert current temp -->(.*?)[<&]/) {
+			if ($line =~ /<!-- insert current tempature --.*>(.*?)(<|&deg)/) {
 				$results{temp} = $1;
 			}
 		}
@@ -175,12 +180,12 @@ sub lookup {
 			}
 		}
 		if (!$results{uv}) {
-			if ($line =~ /<!-- insert UV number -->(.*?)[<&]/) {
+			if ($line =~ /<!-- insert UV index -->(.*?)[<&]/) {
 				$results{uv} = $1;
 			}
 		}
 		if (!$results{wind}) {
-			if ($line =~ /<!-- insert wind information -->(.*?)[<&]/) {
+			if ($line =~ /<!-- insert wind -->\s*(.*?)[<&]/) {
 				$results{wind} = $1;
 			}
 		}
@@ -199,20 +204,12 @@ sub lookup {
 				$results{visb} = $1;
 			}
 		}
-		if (!$results{visb}) {
-			if ($line =~ /<!-- insert visibility -->(.*?)[<&]/) {
-				$results{visb} = $1;
-			}
-		}
 		if (!$results{baro}) {
-			if ($line =~ /<!-- insert barometer information -->(.*?)[<&]/) {
+			if ($line =~ /<!-- insert pressure -->(.*?)[<&]/) {
 				$results{baro} = $1;
 			}
 		}
 
-		if ($line =~ /$end_report_marker/) {
-			last;
-		}
 	}
 	if (!($results{visb})) {
 		$results{visb} = 'Not Available';
@@ -303,15 +300,16 @@ B<Returns>
 	baro		- Current barometric pressure
 	heat		- Current heat index (Feels Like string)
 
-	On error, it returns the following exported error variables
-
 B<Errors>
+
+	On error, it returns one of the following exported error variables
 
 	$ERROR_QUERY		- Invalid data supplied
 	$ERROR_PAGE_INVALID	- No URL, or incorrectly formatted URL for retrieving the information
 	$ERROR_CONNECT		- Error connecting to weather.com
 	$ERROR_NOT_FOUND	- Weather for the specified city/state or zip could not be found
 	$ERROR_TIMEOUT		- Timed out while trying to connect or get data from weather.com
+	$ERROR_BUSY		- weather.com is too busy to handle requests and is in Severe Weather Alert Mode
 
 =back
 
@@ -323,6 +321,7 @@ Returns an HTML table containing the current weather. Must call get_weather firs
 
 B<Sample Code>
 
+	$weather->get_weather('90210');
 	print $weather->report();
 
 =back
@@ -374,7 +373,7 @@ Sets the username to use for proxying. Defaults to the HTTP_PROXY_USER environme
 
 Sets the password to use for proxying. Defaults to the HTTP_PROXY_PASS environment variable, if set.
 
-=item *B<agent_string>
+=item * B<agent_string>
 
 HTTP User-Agent header for request. Default is Geo::Weather/$VERSION.
 
