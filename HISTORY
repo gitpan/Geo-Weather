@@ -9,3 +9,9 @@
 0.05 Complete rewrite of parsing code because of more weather.com changes. By the looks of their
      new tags, one would hope they will not be making more changes in the near future. Timeout
      code has also been added.
+
+0.06 Added make test and more debugging capabilities.
+
+0.07 Converted to LWP::UserAgent to fix socket problems. Be sure to use a recent libwww-perl so timeout
+     code works correctly.
+

@@ -16,6 +16,7 @@ SYNOPSIS
 
       my $weather = new Geo::Weather;
       $weather->{timeout} = 5; # set timeout to 5 seconds instead of the default of 10
+      #$weather->{proxy} = 'http://proxy1.mydomain.com:8001/'; # Uncomment to enable proxy
  
       my $current = $weather->get_weather('95630');
 
@@ -23,7 +24,10 @@ SYNOPSIS
 
 DESCRIPTION
     The Geo::Weather module retrieves the current weather from weather.com
-    when given city and state or a US zip code
+    when given city and state or a US zip code. Geo::Weather relies on
+    LWP::UserAgent to work. In order for the timeout code to work correctly,
+    you must be using a recent version of libwww-perl and IO::Socket.
+    Geo::Weather was developed with libwww-perl 5.53 and IO::Socket 1.26.
 
 FUNCTIONS
     * new
@@ -50,6 +54,7 @@ FUNCTIONS
 
                 city            - City
                 state           - State
+                zip             - Zipcode of US city
                 pic             - weather.com URL to the current weather image
                 url             - Weather.com URL to the weather results
                 cond            - Current condition
@@ -100,12 +105,21 @@ OBJECT KEYS
     Below is a list of each key and what it does:
 
     * debug
-    Enable debug output of the connection attempts to weather.com
+    Enable debug output of the connection attempts to weather.com Valid
+    values are 0 to 4, increasing debugging respectivley.
 
     * timeout
     Controls the timeout, in seconds, when trying to connect to or get data
-    from weather.com. Default timeout is 10 seconds.
+    from weather.com. Default timeout is 10 seconds. Set to 0 to disable
+    timeouts.
+
+    * proxy
+    Use HTTP proxy for the request. Format is http://proxy.server:port/.
+    Default is no proxy.
+
+    *agent_string
+    HTTP User-Agent header for request. Default is Geo::Weather/$VERSION.
 
 AUTHOR
-     Geo::Weather was wrtten by Mike Machado I<E<lt>mike@innercite.comE<gt>>
+     Geo::Weather was wrtten by Mike Machado <mike@innercite.com>
 

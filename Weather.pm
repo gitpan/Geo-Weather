@@ -6,7 +6,7 @@ package Geo::Weather;
 
 use strict;
 use Carp;
-use IO::Socket;
+use LWP::UserAgent;
 
 use vars qw( $VERSION @ISA @EXPORT @EXPORT_OK
 		 $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT);
@@ -16,7 +16,7 @@ require Exporter;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw();
 @EXPORT = qw( $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND $ERROR_TIMEOUT );
-$VERSION = '0.05';
+$VERSION = '0.07';
 
 $OK = 1;
 $ERROR_UNKNOWN = 0;
@@ -25,8 +25,6 @@ $ERROR_PAGE_INVALID = -2;
 $ERROR_CONNECT = -3;
 $ERROR_NOT_FOUND = -4;
 $ERROR_TIMEOUT = -5;
-
-my $alarm_caught = 0;
 
 sub new {
 	my $class = shift;
@@ -37,8 +35,8 @@ sub new {
 	$self->{port} = 80;
 	$self->{base} = '/search/search';
 	$self->{timeout} = 10;
-
-	$SIG{ALRM} = sub { $alarm_caught = 1;};
+	$self->{proxy} = '';
+	$self->{agent_string} = 'Geo::Weather/0.07';
 
 	bless $self, $class;
 	return $self;
@@ -103,61 +101,52 @@ sub lookup {
 	$results{url} = "http://$self->{server}";
 	$results{url} .= ":$self->{port}" unless $self->{port} eq '80';
 	$results{url} .= $page;
+	$results{page} = $page;
 
 	my $not_found_marker = 'could not be found';
 	my $end_report_marker = 'Audio and Video Forecast';
-	my $lines_read = 0;
 	my $line = '';
 
-	print STDERR __LINE__, ": Geo::Weather: Attempting to connect to $self->{server}:$self->{port}\n" if $self->{debug};
+	print STDERR __LINE__, ": Geo::Weather: Attempting to GET $results{url}\n" if $self->{debug};
+	my $ua = new LWP::UserAgent;
+	my $request = new HTTP::Request('GET',$results{url});
 
-	alarm($self->{timeout});
-	my $remote = IO::Socket::INET->new(Proto=>'tcp', PeerAddr=>$self->{server}, PeerPort=>$self->{port}, Reuse=>1) || return $ERROR_CONNECT;
-	return $ERROR_TIMEOUT if $alarm_caught;
+	$ua->timeout($self->{timeout}) if $self->{timeout};
+	$ua->agent($self->{agent_string});
+	$ua->proxy(['http'], $self->{proxy}) if $self->{proxy};
 
-	print STDERR __LINE__, ": Geo::Weather: Getting $page from $self->{server}:$self->{port}\n" if $self->{debug};
-	$results{page} = $page;
-	print $remote "GET $page HTTP/1.1\n";
-	print $remote "Host: $self->{server}\n\n";
+	my $response = $ua->request($request);
+	unless ($response->is_success) {
+		return $ERROR_TIMEOUT;
+	}
+	my $content = $response->content();
 
-	if (!$redir) {
-		alarm($self->{timeout});
-		while ($line = <$remote>) {
-			chop($line);
-			chop($line);
-			return $ERROR_NOT_FOUND if ($line =~ /$not_found_marker/i);
-			if ($line =~ /location: http:\/\/.*?\/(.*)/) {
-				$page = '/'.$1;
-				close($remote);
-				return $self->lookup($page, 1);
-			} elsif ($line =~ /categoryTitle/) {
-				$line = <$remote>;
-				$line = <$remote>;
-				chop($line);
-				chop($line);
-				close($remote);
-				if ($line =~ /\"(.*?)\"/) {
-					print STDERR __LINE__, ": Geo::Weather: Found search result $1\n" if $self->{debug};
-					return $self->lookup($1, 1);
-				}
+	my @lines = split(/\n/, $content);
+	for (my $i = 0; $i < @lines; $i++) {
+		my $line = $lines[$i];
+
+		print STDERR "tagline: $line\n" if ($line =~ /<!-- insert/ && $self->{debug} > 2);
+		print STDERR "line: $line\n" if $self->{debug} > 3;
+
+		return $ERROR_NOT_FOUND if ($line =~ /$not_found_marker/i);
+
+		if ($line =~ /categoryTitle/) {
+			$line = $lines[$i + 2];
+			if ($line =~ /\"(.*?)\"/) {
+				print STDERR __LINE__, ": Geo::Weather: Found search result $1\n" if $self->{debug};
+				return $self->lookup($1);
 			}
 		}
-		return $ERROR_TIMEOUT if $alarm_caught;
-		return $ERROR_NOT_FOUND;
-	}
-
-	my $x = '';
-	alarm($self->{timeout});
-	while($line = <$remote>) {
-
-		chop($line);
-		chomp($line);
-		$lines_read++;
 
 		if ($line =~ /\<TITLE\>weather.com - Local Weather - (.*?)\<\/TITLE\>/) {
 			my ($city, $state) = split(/\,[\s+]/, $1);
 			$results{city} = $city;
-			$results{state} = $state;
+			if ($state =~ /(.*)\s+\((.*)\)/) {
+				$results{state} = $1;
+				$results{zip} = $2;
+			} else {
+				$results{state} = $state;
+			}
 		}
 		if (!$results{pic}) {
 			if ($line =~ /<!-- insert wx icon --><img src=\"(.*?)\"/) {
@@ -219,16 +208,9 @@ sub lookup {
 			last;
 		}
 	}
-	if ($alarm_caught) {
-		close($remote);
-		return $ERROR_TIMEOUT;
-	}
-
 	if (!($results{visb})) {
 		$results{visb} = 'Not Available';
 	}
-
-	close($remote);
 
 	return \%results;
 }
@@ -265,7 +247,9 @@ Geo::Weather - Weather retrieval module
 
 =head1 DESCRIPTION
 
-The B<Geo::Weather> module retrieves the current weather from weather.com when given city and state or a US zip code
+The B<Geo::Weather> module retrieves the current weather from weather.com when given city and state or a US zip code. B<Geo::Weather> relies on
+LWP::UserAgent to work. In order for the timeout code to work correctly, you must be using a recent version of libwww-perl and IO::Socket. B<Geo::Weather>
+was developed with libwww-perl 5.53 and IO::Socket 1.26.
 
 =head1 FUNCTIONS
 
@@ -301,6 +285,7 @@ B<Returns>
 
 	city		- City
 	state		- State
+	zip		- Zipcode of US city
 	pic		- weather.com URL to the current weather image
 	url		- Weather.com URL to the weather results
 	cond		- Current condition
@@ -364,12 +349,20 @@ Below is a list of each key and what it does:
 
 =item * B<debug>
 
-Enable debug output of the connection attempts to weather.com
+Enable debug output of the connection attempts to weather.com Valid values are 0 to 4, increasing debugging respectivley.
 
 =item * B<timeout>
 
 Controls the timeout, in seconds, when trying to connect to or get data from weather.com. Default timeout
-is 10 seconds.
+is 10 seconds. Set to 0 to disable timeouts.
+
+=item * B<proxy>
+
+Use HTTP proxy for the request. Format is http://proxy.server:port/. Default is no proxy.
+
+=item *B<agent_string>
+
+HTTP User-Agent header for request. Default is Geo::Weather/$VERSION.
 
 =head1 AUTHOR
 
