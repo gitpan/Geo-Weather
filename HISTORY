@@ -3,3 +3,5 @@
 0.02  Changes to new weather.com site
 
 0.03 Added support for HTTP/1.1 because Weather.com requires HTTP/1.1 only
+
+0.04 Changed how the current condition was located before of more weather.com changes

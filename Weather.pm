@@ -17,7 +17,7 @@ require Exporter;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw();
 @EXPORT = qw( $OK $ERROR_UNKNOWN $ERROR_QUERY $ERROR_PAGE_INVALID $ERROR_CONNECT $ERROR_NOT_FOUND );
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 $OK = 1;
 $ERROR_UNKNOWN = 0;
@@ -72,7 +72,7 @@ sub report {
 	my $output = '';
 	my $results = $self->{results};
 	$output .= "<font size=+4>$results->{city}, $results->{state}</font><br>\n";
-	$output .= "<img src=\"$results->{pic}\" border=0>\n";
+	$output .= "<a href=\"$results->{url}\"><img src=\"$results->{pic}\" border=0></a>\n";
 	$output .= "<font size=+3>$results->{cond}</font><br>\n";
 	$output .= "<table border=0>\n";
 	$output .= "<tr><td><b>Temp</b></td><td>$results->{temp}&deg F</td>\n";
@@ -96,10 +96,14 @@ sub lookup {
 
 	my %results = ();
 
+	$results{url} = "http://$self->{server}";
+	$results{url} .= ":$self->{port}" unless $self->{port} eq '80';
+	$results{url} .= $page;
+
 	my $marker='<!-- Begin Main Content Here';
 	my $end_report_marker='UV Index';
 	my $not_found_marker = 'could not be found';
-	my $lines =90;
+	my $lines = 90;
 	my $lines_read = 0;
 	my $line = '';
 
@@ -161,18 +165,21 @@ sub lookup {
 			last;
 		}
 
-		if(!($results{pic})) {
+		if(!($results{pic}) || !($results{cond})) {
 			if($line =~ /wxicons/) {
 				if ($line =~ /\"(.*?)\"/) {
 					$results{pic} = $1;
-					next;
 				}
+				if ($line =~ /(ALT|alt)=\"(.*?)\"/) {
+					$results{cond} = $2 unless $results{cond};
+				}
+				next;
 			}
 		}
-		if (!($results{cond})) {
+		if (!($results{cond}) || !($results{head})) {
 			if ($line =~ /Feels Like/) {
 				if ($line =~ /\<.*?>(.*?)\<BR\>Feels Like&nbsp;(.*)/) {
-					$results{cond} = $1;
+					$results{cond} = $1 unless $results{cond};
 					$results{heat} = $2;
 					if ($results{heat} =~ /(\d+).*/) {
 						$results{heat} = $1;
@@ -328,6 +335,7 @@ B<Returns>
 	city		- City
 	state		- State
 	pic		- weather.com URL to the current weather image
+	url		- Weather.com URL to the weather results
 	cond		- Current condition
 	temp		- Current temperature (degees F)
 	wind		- Current wind speed
@@ -382,6 +390,6 @@ B<Returns>
 
 =head1 AUTHOR
 
- Geo::Weather was wrtten by Mike Machado I<E<lt>mike@innercite.comE<gt>> with the main weather.com retrieval code from I<E<lt>hawk@redtailedhawk.netE<gt>>
+ Geo::Weather was wrtten by Mike Machado I<E<lt>mike@innercite.comE<gt>>
 
 =cut
