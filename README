@@ -1,0 +1,7 @@
+Geo::Weather
+
+ perl Makefile.PL
+ make
+ make install
+
+ perldoc Geo::Weather
